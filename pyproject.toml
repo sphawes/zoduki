@@ -9,7 +9,8 @@ authors = [
     { name = "Stephen Hawes", email = "sphawes@gmail.com" },
 ]
 dependencies = [
-    "mkdocs>=1.6"
+    "mkdocs>=1.6",
+    "beautifulsoup4>=4.12",
 ]
 
 [project.urls]
