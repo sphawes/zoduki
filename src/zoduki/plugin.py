@@ -496,10 +496,106 @@ class ZodukiPlugin(BasePlugin):
     gap: .75rem;
   }}
 }}
+.zoduki__view-toggle {{
+  align-items: center;
+  background: none;
+  border: 1px solid var(--zoduki-border);
+  border-radius: 999px;
+  color: var(--md-default-fg-color--light);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: .68rem;
+  gap: .4rem;
+  letter-spacing: .02em;
+  padding: .3rem .65rem .3rem .5rem;
+  text-transform: uppercase;
+}}
+.zoduki__view-toggle-track {{
+  background: var(--md-default-fg-color--lightest);
+  border-radius: 999px;
+  display: inline-block;
+  flex: none;
+  height: .9rem;
+  position: relative;
+  width: 1.6rem;
+}}
+.zoduki__view-toggle-knob {{
+  background: var(--md-primary-fg-color);
+  border-radius: 50%;
+  height: .7rem;
+  left: .1rem;
+  position: absolute;
+  top: .1rem;
+  transition: transform .15s ease;
+  width: .7rem;
+}}
+.zoduki__view-toggle[aria-checked="true"] .zoduki__view-toggle-knob {{
+  transform: translateX(.7rem);
+}}
+.zoduki[data-view="list"] .zoduki__nav {{
+  position: static;
+}}
+.zoduki[data-view="list"] .zoduki__steps {{
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible;
+}}
+.zoduki[data-view="list"] .zoduki__step {{
+  align-items: start;
+  border-bottom: 1px solid var(--zoduki-border);
+  display: grid;
+  height: auto;
+  margin-bottom: 2rem;
+  padding-bottom: 2rem;
+  scroll-margin-top: 4.5rem;
+}}
+.zoduki[data-view="list"] .zoduki__step:last-child {{
+  border-bottom: none;
+}}
+.zoduki[data-view="list"] .zoduki__media,
+.zoduki[data-view="list"] .zoduki__copy {{
+  overflow: visible;
+}}
+.zoduki[data-view="list"] .zoduki__main-image {{
+  display: none;
+}}
+.zoduki[data-view="list"] .zoduki__thumbs {{
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+  margin-top: 0;
+  padding: 0;
+}}
+.zoduki[data-view="list"] .zoduki__thumb {{
+  border-radius: .25rem;
+  border-width: .2rem;
+  cursor: default;
+  width: 100%;
+}}
+.zoduki[data-view="list"] .zoduki__thumb[aria-current="true"] {{
+  box-shadow: none;
+}}
+.zoduki[data-view="list"] .zoduki__thumb img {{
+  aspect-ratio: auto;
+  background: var(--md-code-bg-color);
+  max-height: 24rem;
+  object-fit: contain;
+  width: 100%;
+}}
+.zoduki[data-view="list"] [data-zoduki-progress] {{
+  display: none;
+}}
+.zoduki[data-view="list"] .zoduki__controls {{
+  display: none;
+}}
 </style>
 <div class="zoduki" data-zoduki>
   <nav class="zoduki__nav" aria-label="Guide progress">
     <div class="zoduki__crumbs"><span>{page_title_attr}</span></div>
+    <button type="button" class="zoduki__view-toggle" data-zoduki-toggle-view role="switch" aria-checked="false" aria-label="Switch between step-by-step and scrollable list view">
+      <span class="zoduki__view-toggle-track"><span class="zoduki__view-toggle-knob"></span></span>
+      <span data-zoduki-toggle-label>List view</span>
+    </button>
     <span data-zoduki-progress></span>
   </nav>
   <div class="zoduki__steps" data-zoduki-steps>
@@ -518,6 +614,28 @@ class ZodukiPlugin(BasePlugin):
   const progress = root.querySelector("[data-zoduki-progress]");
   const previous = root.querySelector("[data-zoduki-prev]");
   const next = root.querySelector("[data-zoduki-next]");
+  const viewToggle = root.querySelector("[data-zoduki-toggle-view]");
+  const viewToggleLabel = root.querySelector("[data-zoduki-toggle-label]");
+
+  function readSavedView() {{
+    try {{
+      return localStorage.getItem("zoduki-view");
+    }} catch (error) {{
+      return null;
+    }}
+  }}
+
+  function saveView(view) {{
+    try {{
+      localStorage.setItem("zoduki-view", view);
+    }} catch (error) {{
+      // ignore storage errors (private browsing, disabled storage, etc.)
+    }}
+  }}
+
+  function isListView() {{
+    return root.dataset.view === "list";
+  }}
 
   function fitStepToViewport() {{
     const containerTop = stepContainer.getBoundingClientRect().top;
@@ -694,6 +812,21 @@ class ZodukiPlugin(BasePlugin):
     let index = steps.findIndex((step) => stepMatchesHash(step, slug));
     if (index < 0) index = 0;
 
+    if (isListView()) {{
+      steps.forEach((step) => {{
+        step.hidden = false;
+      }});
+      syncTocHighlight(steps[index], slug);
+      if (updateHash) {{
+        const canonicalHash = steps[index].dataset.stepId;
+        if (window.location.hash.slice(1) !== canonicalHash) {{
+          history.pushState(null, "", "#" + canonicalHash);
+        }}
+        steps[index].scrollIntoView({{ behavior: "smooth", block: "start" }});
+      }}
+      return;
+    }}
+
     fitLayoutToViewport();
     steps.forEach((step, stepIndex) => {{
       step.hidden = stepIndex !== index;
@@ -708,6 +841,27 @@ class ZodukiPlugin(BasePlugin):
     if (currentHash !== canonicalHash) {{
       const method = updateHash ? "pushState" : "replaceState";
       history[method](null, "", "#" + canonicalHash);
+    }}
+  }}
+
+  function applyView(view, persist) {{
+    root.dataset.view = view;
+    if (viewToggle) {{
+      viewToggle.setAttribute("aria-checked", view === "list" ? "true" : "false");
+    }}
+    if (viewToggleLabel) {{
+      viewToggleLabel.textContent = view === "list" ? "Step view" : "List view";
+    }}
+    if (persist) saveView(view);
+
+    if (view === "list") {{
+      steps.forEach((step) => {{
+        step.hidden = false;
+      }});
+      const sidebarScrollwrap = document.querySelector(".md-sidebar--primary .md-sidebar__scrollwrap");
+      if (sidebarScrollwrap) sidebarScrollwrap.style.maxHeight = "";
+    }} else {{
+      showStep(window.location.hash.slice(1), false);
     }}
   }}
 
@@ -747,20 +901,33 @@ class ZodukiPlugin(BasePlugin):
     }}
   }});
 
+  viewToggle?.addEventListener("click", () => {{
+    applyView(isListView() ? "step" : "list", true);
+  }});
+
   window.addEventListener("hashchange", () => showStep(window.location.hash.slice(1), false));
   window.addEventListener("resize", () => {{
+    if (isListView()) return;
     fitLayoutToViewport();
     updateControls();
   }});
   window.addEventListener("orientationchange", () => {{
     setTimeout(() => {{
+      if (isListView()) return;
       fitLayoutToViewport();
       updateControls();
     }}, 100);
   }});
   buildFlatToc();
-  fitLayoutToViewport();
-  showStep(window.location.hash.slice(1), false);
+
+  const savedView = readSavedView() === "list" ? "list" : "step";
+  applyView(savedView, false);
+  if (savedView !== "list") {{
+    fitLayoutToViewport();
+    showStep(window.location.hash.slice(1), false);
+  }} else {{
+    syncTocHighlight(steps[Math.max(0, steps.findIndex((step) => stepMatchesHash(step, window.location.hash.slice(1))))], window.location.hash.slice(1));
+  }}
 }}());
 </script>
 """
@@ -794,7 +961,7 @@ class ZodukiPlugin(BasePlugin):
         toc_slug = self._escape_attr(step.toc_slug)
 
         return f"""
-<section class="zoduki__step" data-zoduki-step data-step-id="{slug}" data-step-aliases="{aliases}" data-toc-id="{toc_slug}" data-step-title="{title_attr}" data-parent="{parent}" data-active-image="0" hidden>
+<section class="zoduki__step" id="{slug}" data-zoduki-step data-step-id="{slug}" data-step-aliases="{aliases}" data-toc-id="{toc_slug}" data-step-title="{title_attr}" data-parent="{parent}" data-active-image="0" hidden>
   <div class="zoduki__media">
     {main_image}
     <div class="zoduki__thumbs" aria-label="Step images">{thumbs}</div>

@@ -105,6 +105,12 @@ zoduki: true
 
 Each step gets a stable URL hash from its heading, e.g. `#install-fasteners`. The left nav links directly to steps and stays in sync with Previous/Next navigation.
 
+## List view
+
+A "List view" toggle switch appears at the top of every zoduki page, next to the progress indicator. It flips the page from one-step-at-a-time into a single scrollable document with every step stacked in order — useful for skimming a whole guide, printing it, or using the browser's find-in-page (Ctrl/Cmd+F) to search across every step at once, none of which work while steps are hidden one at a time.
+
+The choice is remembered per-browser (via `localStorage`) and applies across the whole site, not just the current page, so a reader who prefers the flat view keeps it as they navigate between guides.
+
 ---
 
 ## Development
